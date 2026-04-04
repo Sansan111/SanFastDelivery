@@ -19,11 +19,13 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
     private final ProductRepository productRepository;
+    private final KafkaProducerService kafkaProducerService;
 
-    public OrderService(OrderRepository orderRepository, UserRepository userRepository, ProductRepository productRepository) {
+    public OrderService(OrderRepository orderRepository, UserRepository userRepository, ProductRepository productRepository, KafkaProducerService kafkaProducerService) {
         this.orderRepository = orderRepository;
         this.userRepository = userRepository;
         this.productRepository = productRepository;
+        this.kafkaProducerService = kafkaProducerService;
     }
 
     @Transactional
@@ -60,7 +62,8 @@ public class OrderService {
         // 4. บันทึกลง Database
         Order savedOrder = orderRepository.save(order);
 
-        // TODO: ส่ง Event "Order Created" เข้าหา Kafka Topic
+        // 5. ส่ง Event "Order Created" เข้าหา Kafka Topic เพื่อให้ระบบอื่นรู้
+        kafkaProducerService.sendOrderCreatedEvent(savedOrder.getId());
 
         return savedOrder;
     }
