@@ -16,6 +16,8 @@ export const metadata: Metadata = {
   description: "Online Delivery Application with AI",
 };
 
+import ClientLayout from "@/components/ClientLayout";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -24,7 +26,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body>
-        <AntdRegistry>{children}</AntdRegistry>
+        <AntdRegistry>
+          <ClientLayout>
+            {children}
+          </ClientLayout>
+        </AntdRegistry>
       </body>
     </html>
   );
