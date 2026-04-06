@@ -13,8 +13,8 @@ public class KafkaProducerService {
     }
 
     public void sendOrderCreatedEvent(Long orderId) {
-        // สร้างข้อความจำลองง่ายๆ เพื่อส่งว่าออเดอร์นี้เสร็จแล้ว
-        String message = "Order Created: " + orderId;
+        // ส่งแค่ Order ID เพื่อให้ Consumer ดึงข้อมูลต่อได้
+        String message = orderId.toString();
         
         // ส่ง (Publish) เข้าไปที่ Topic ชื่อ 'order-created'
         kafkaTemplate.send("order-created", message);

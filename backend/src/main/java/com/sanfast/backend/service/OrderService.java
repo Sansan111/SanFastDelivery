@@ -67,4 +67,19 @@ public class OrderService {
 
         return savedOrder;
     }
+
+    @Transactional(readOnly = true)
+    public String getOrderStatus(Long orderId) {
+        return orderRepository.findById(orderId)
+                .map(Order::getStatus)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+    }
+
+    @Transactional
+    public void updateOrderStatus(Long orderId, String newStatus) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+        order.setStatus(newStatus);
+        orderRepository.save(order);
+    }
 }

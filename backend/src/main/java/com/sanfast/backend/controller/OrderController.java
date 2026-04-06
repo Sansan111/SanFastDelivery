@@ -17,13 +17,23 @@ public class OrderController {
         this.orderService = orderService;
     }
 
-    @PostMapping
+    @PostMapping // ต้องยิงข้อมูล post มาเท่านั้น get ไม่ได้
     public ResponseEntity<?> createOrder(@RequestBody CreateOrderRequest request) {
         try {
             Order order = orderService.createOrder(request);
             return ResponseEntity.ok(order);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/{id}/status")
+    public ResponseEntity<java.util.Map<String, String>> getOrderStatus(@PathVariable Long id) {
+        try {
+            String status = orderService.getOrderStatus(id);
+            return ResponseEntity.ok(java.util.Map.of("status", status));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
         }
     }
 }
