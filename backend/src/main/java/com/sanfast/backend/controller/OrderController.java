@@ -36,4 +36,13 @@ public class OrderController {
             return ResponseEntity.badRequest().build();
         }
     }
+
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<java.util.List<com.sanfast.backend.dto.OrderResponse>> getOrdersByUser(@PathVariable Long userId) {
+        try {
+            return ResponseEntity.ok(orderService.getOrdersByUserId(userId));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
 }

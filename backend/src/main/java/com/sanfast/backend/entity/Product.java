@@ -25,6 +25,15 @@ public class Product {
     @Column(name = "is_active")
     private Boolean isActive = true;
 
+    // tags: comma-separated keywords เช่น "spicy,cold,low-calorie"
+    private String tags;
+
+    // แคลอรี่ต่อจาน
+    private Integer calories;
+
+    // หมวดหมู่ เช่น "อาหารจานเดียว", "ของหวาน", "เครื่องดื่ม"
+    private String category;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -41,6 +50,12 @@ public class Product {
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
     public Boolean getIsActive() { return isActive; }
     public void setIsActive(Boolean isActive) { this.isActive = isActive; }
+    public String getTags() { return tags; }
+    public void setTags(String tags) { this.tags = tags; }
+    public Integer getCalories() { return calories; }
+    public void setCalories(Integer calories) { this.calories = calories; }
+    public String getCategory() { return category; }
+    public void setCategory(String category) { this.category = category; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

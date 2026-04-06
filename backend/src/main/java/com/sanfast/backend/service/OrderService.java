@@ -12,6 +12,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.stream.Collectors;
+import com.sanfast.backend.dto.OrderResponse;
 
 @Service
 public class OrderService {
@@ -50,6 +53,7 @@ public class OrderService {
             orderItem.setProduct(product);
             orderItem.setQuantity(itemReq.getQuantity());
             orderItem.setPriceAtPurchase(product.getPrice());
+            orderItem.setNote(itemReq.getNote());
             
             order.addItem(orderItem);
 
@@ -81,5 +85,35 @@ public class OrderService {
                 .orElseThrow(() -> new RuntimeException("Order not found"));
         order.setStatus(newStatus);
         orderRepository.save(order);
+    }
+
+    @Transactional(readOnly = true)
+    public List<OrderResponse> getOrdersByUserId(Long userId) {
+        List<Order> orders = orderRepository.findByUserId(userId);
+        return orders.stream().map(this::mapToOrderResponse).collect(Collectors.toList());
+    }
+
+    private OrderResponse mapToOrderResponse(Order order) {
+        OrderResponse response = new OrderResponse();
+        response.setId(order.getId());
+        response.setUserId(order.getUser().getId());
+        response.setTotalAmount(order.getTotalAmount());
+        response.setStatus(order.getStatus());
+        response.setCreatedAt(order.getCreatedAt());
+
+        List<OrderResponse.OrderItemResponse> itemResponses = order.getItems().stream().map(item -> {
+            OrderResponse.OrderItemResponse itemRes = new OrderResponse.OrderItemResponse();
+            itemRes.setId(item.getId());
+            itemRes.setProductId(item.getProduct().getId());
+            itemRes.setProductName(item.getProduct().getName());
+            itemRes.setProductImageUrl(item.getProduct().getImageUrl());
+            itemRes.setQuantity(item.getQuantity());
+            itemRes.setPriceAtPurchase(item.getPriceAtPurchase());
+            itemRes.setNote(item.getNote());
+            return itemRes;
+        }).collect(Collectors.toList());
+
+        response.setItems(itemResponses);
+        return response;
     }
 }

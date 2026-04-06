@@ -24,6 +24,9 @@ public class OrderItem {
     @Column(name = "price_at_purchase", nullable = false)
     private BigDecimal priceAtPurchase;
 
+    @Column(length = 1000)
+    private String note;
+
     // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -35,4 +38,6 @@ public class OrderItem {
     public void setQuantity(Integer quantity) { this.quantity = quantity; }
     public BigDecimal getPriceAtPurchase() { return priceAtPurchase; }
     public void setPriceAtPurchase(BigDecimal priceAtPurchase) { this.priceAtPurchase = priceAtPurchase; }
+    public String getNote() { return note; }
+    public void setNote(String note) { this.note = note; }
 }
