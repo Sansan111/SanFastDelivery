@@ -41,6 +41,7 @@ echo "[dev-down] Stopping local services..."
 stop_pid_file "gateway"
 stop_pid_file "restaurant"
 stop_pid_file "order"
+stop_pid_file "notification"
 
 echo "[dev-down] Done."
 echo "[dev-down] If you also want to stop infra:"

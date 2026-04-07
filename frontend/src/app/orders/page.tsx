@@ -5,6 +5,8 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Tabs, Steps, Button, List, Badge, message } from 'antd';
 import { ShoppingOutlined, FireOutlined, CheckCircleOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useCartStore } from '@/store/useCartStore';
+import { apiFetch } from '@/lib/api';
+import { isLoggedIn } from '@/lib/auth';
 import './page.css';
 import '../page.css';
 
@@ -38,7 +40,11 @@ function OrdersContent() {
 
   const fetchOrders = async () => {
     try {
-      const res = await fetch('http://localhost:8080/api/orders/user/1');
+      if (!isLoggedIn()) {
+        setOrders([]);
+        return;
+      }
+      const res = await apiFetch('/api/orders/me');
       if (res.ok) {
         const data = await res.json();
         // เรียงจากใหม่ไปเก่า (สมมติว่า id เรียงตามเวลา)
@@ -65,7 +71,7 @@ function OrdersContent() {
     const ok = window.confirm('ต้องการยกเลิก/ลบออเดอร์นี้ใช่ไหม?');
     if (!ok) return;
     try {
-      const res = await fetch(`http://localhost:8080/api/orders/${orderId}?userId=1`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/orders/${orderId}`, { method: 'DELETE' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         message.error(data?.error || 'ลบออเดอร์ไม่สำเร็จ');
@@ -212,7 +218,11 @@ function OrdersContent() {
         {loading ? (
           <div className="empty-state">กำลังโหลดข้อมูล...</div>
         ) : (
+          !isLoggedIn() ? (
+            <div className="empty-state">กรุณา Login เพื่อดูออเดอร์ของคุณ</div>
+          ) : (
           <Tabs defaultActiveKey="1" items={tabItems} activeKey={activeTab} onChange={setActiveTab} />
+          )
         )}
       </div>
     </div>

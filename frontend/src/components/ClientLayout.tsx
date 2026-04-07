@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { Badge, Drawer, List, Button, message } from 'antd';
 import { ShoppingCartOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useCartStore } from '@/store/useCartStore';
+import { apiFetch } from '@/lib/api';
+import { clearAuthToken, isLoggedIn } from '@/lib/auth';
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -18,13 +20,16 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
   const handleCheckout = async () => {
     if (items.length === 0) return message.warning('กรุณาเลือกเมนูก่อนนะครับ');
+    if (!isLoggedIn()) {
+      message.info('กรุณา Login ก่อนสั่งอาหาร');
+      router.push('/login');
+      return;
+    }
     setSubmitting(true);
     try {
-      const res = await fetch('http://localhost:8080/api/orders', {
+      const res = await apiFetch('/api/orders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: 1,
           items: items.map(i => ({
             productId: i.productId,
             quantity: i.quantity,
@@ -55,6 +60,16 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           <Link href="/" style={{ color: pathname === '/' ? '#C8973B' : undefined }}>หน้าแรก</Link>
           <Link href="/#menu">เมนูอาหาร</Link>
           <Link href="/orders" style={{ color: pathname === '/orders' ? '#C8973B' : undefined }}>ออเดอร์ของฉัน</Link>
+          {isLoggedIn() ? (
+            <button
+              onClick={() => { clearAuthToken(); message.success('ออกจากระบบแล้ว'); router.push('/'); }}
+              style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#3D1A00', fontFamily: 'Lato' }}
+            >
+              ออกจากระบบ
+            </button>
+          ) : (
+            <Link href="/login" style={{ color: pathname === '/login' ? '#C8973B' : undefined }}>Login</Link>
+          )}
         </nav>
         <Badge count={totalItems} color="#C8973B">
           <button className="cart-btn" onClick={() => setCartVisible(true)}>

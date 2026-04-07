@@ -37,6 +37,7 @@ start_service() {
 start_service "gateway" "$BACKEND_DIR/gateway-service" "$BACKEND_DIR/gateway.log"
 start_service "restaurant" "$BACKEND_DIR/restaurant-service" "$BACKEND_DIR/restaurant.log"
 start_service "order" "$BACKEND_DIR/order-service" "$BACKEND_DIR/order.log"
+start_service "notification" "$BACKEND_DIR/notification-service" "$BACKEND_DIR/notification.log"
 
 echo
 echo "[dev-up] Done."
@@ -44,9 +45,11 @@ echo "[dev-up] Logs:"
 echo "  - $BACKEND_DIR/gateway.log"
 echo "  - $BACKEND_DIR/restaurant.log"
 echo "  - $BACKEND_DIR/order.log"
+echo "  - $BACKEND_DIR/notification.log"
 echo
 echo "[dev-up] Health checks (give it a few seconds to boot):"
 echo "  curl -sS http://localhost:8080/actuator/health"
 echo "  curl -sS http://localhost:8081/actuator/health"
 echo "  curl -sS http://localhost:8082/actuator/health"
+echo "  curl -sS http://localhost:8083/actuator/health"
 

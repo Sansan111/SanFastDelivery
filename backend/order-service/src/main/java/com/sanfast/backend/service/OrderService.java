@@ -11,6 +11,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.kafka.core.KafkaTemplate;
+import com.sanfast.backend.events.OrderCreatedEvent;
+import org.springframework.amqp.core.DirectExchange;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -26,22 +30,40 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final RabbitTemplate rabbitTemplate;
+    private final DirectExchange orderEventsExchange;
     private static final Set<String> DELETABLE_STATUSES = Set.of("PENDING", "PREPARING");
     private final RestTemplate restTemplate = new RestTemplate();
 
     @Value("${restaurant.service.base-url:http://localhost:8081}")
     private String restaurantServiceBaseUrl;
 
-    public OrderService(OrderRepository orderRepository, UserRepository userRepository) {
+    @Value("${sanfast.kafka.topic.order-created:order.created}")
+    private String orderCreatedTopic;
+
+    @Value("${sanfast.rabbitmq.routing-key.order-created:order.created}")
+    private String orderCreatedRoutingKey;
+
+    public OrderService(
+            OrderRepository orderRepository,
+            UserRepository userRepository,
+            KafkaTemplate<String, Object> kafkaTemplate,
+            RabbitTemplate rabbitTemplate,
+            DirectExchange orderEventsExchange
+    ) {
         this.orderRepository = orderRepository;
         this.userRepository = userRepository;
+        this.kafkaTemplate = kafkaTemplate;
+        this.rabbitTemplate = rabbitTemplate;
+        this.orderEventsExchange = orderEventsExchange;
     }
 
     @Transactional
-    public Order createOrder(CreateOrderRequest request) {
+    public Order createOrder(Long userId, CreateOrderRequest request) {
         // 1. หา User
-        User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new RuntimeException("User not found: " + request.getUserId()));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
 
         // 2. สร้าง Order ใหม่
         Order order = new Order();
@@ -74,7 +96,29 @@ public class OrderService {
         }
 
         order.setTotalAmount(totalAmount);
-        return orderRepository.save(order);
+        Order saved = orderRepository.save(order);
+
+        OrderCreatedEvent event = new OrderCreatedEvent(
+                saved.getId(),
+                saved.getUser() != null ? saved.getUser().getId() : userId,
+                saved.getTotalAmount(),
+                saved.getStatus(),
+                java.time.Instant.now()
+        );
+
+        try {
+            kafkaTemplate.send(orderCreatedTopic, String.valueOf(saved.getId()), event);
+        } catch (Exception ignored) {
+            // keep order creation resilient even if Kafka is unavailable in dev
+        }
+
+        try {
+            rabbitTemplate.convertAndSend(orderEventsExchange.getName(), orderCreatedRoutingKey, event);
+        } catch (Exception ignored) {
+            // keep order creation resilient even if RabbitMQ is unavailable in dev
+        }
+
+        return saved;
     }
 
     @Transactional(readOnly = true)

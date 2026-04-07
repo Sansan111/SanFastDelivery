@@ -6,6 +6,7 @@ import { Button, message, Modal, Input } from 'antd';
 import { StarFilled, ArrowLeftOutlined } from '@ant-design/icons';
 import { useCartStore } from '@/store/useCartStore';
 import AiSearch from '@/components/AiSearch';
+import { API_BASE } from '@/lib/api';
 
 interface Product {
   id: number;
@@ -31,7 +32,7 @@ export default function Home() {
   const [productQuantity, setProductQuantity] = useState(1);
 
   useEffect(() => {
-    fetch('http://localhost:8080/api/products')
+    fetch(`${API_BASE}/api/products`)
       .then(res => {
         if (!res.ok) throw new Error('Cannot connect to backend');
         return res.json();
