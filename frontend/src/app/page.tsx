@@ -31,7 +31,7 @@ export default function Home() {
   const [productQuantity, setProductQuantity] = useState(1);
 
   useEffect(() => {
-    fetch('http://localhost:8081/api/products')
+    fetch('http://localhost:8080/api/products')
       .then(res => {
         if (!res.ok) throw new Error('Cannot connect to backend');
         return res.json();

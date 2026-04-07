@@ -20,7 +20,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     if (items.length === 0) return message.warning('กรุณาเลือกเมนูก่อนนะครับ');
     setSubmitting(true);
     try {
-      const res = await fetch('http://localhost:8081/api/orders', {
+      const res = await fetch('http://localhost:8080/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
