@@ -48,7 +48,7 @@ export default function AiSearch({ onAddToCart }: AiSearchProps) {
     setSearched(false);
     setResults([]);
     try {
-      const res = await fetch('http://localhost:8081/api/ai/recommend', {
+      const res = await fetch('http://localhost:8080/api/ai/recommend', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: q }),

@@ -38,7 +38,7 @@ function OrdersContent() {
 
   const fetchOrders = async () => {
     try {
-      const res = await fetch('http://localhost:8081/api/orders/user/1');
+      const res = await fetch('http://localhost:8080/api/orders/user/1');
       if (res.ok) {
         const data = await res.json();
         // เรียงจากใหม่ไปเก่า (สมมติว่า id เรียงตามเวลา)
@@ -60,6 +60,23 @@ function OrdersContent() {
 
   const ongoingOrders = orders.filter(o => o.status === 'PENDING' || o.status === 'PREPARING');
   const historyOrders = orders.filter(o => o.status === 'DELIVERED');
+
+  const handleDeleteOngoing = async (orderId: number) => {
+    const ok = window.confirm('ต้องการยกเลิก/ลบออเดอร์นี้ใช่ไหม?');
+    if (!ok) return;
+    try {
+      const res = await fetch(`http://localhost:8080/api/orders/${orderId}?userId=1`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        message.error(data?.error || 'ลบออเดอร์ไม่สำเร็จ');
+        return;
+      }
+      message.success('ยกเลิกออเดอร์เรียบร้อยแล้ว');
+      fetchOrders();
+    } catch {
+      message.error('ลบออเดอร์ไม่สำเร็จ');
+    }
+  };
 
   const handleReorder = (order: OrderResponse) => {
     order.items.forEach(item => {
@@ -122,7 +139,14 @@ function OrdersContent() {
           renderItem={item => (
             <List.Item style={{ borderBottom: '1px solid #E0D5C5', padding: '12px 0' }}>
               <List.Item.Meta
-                avatar={<img src={item.productImageUrl} alt={item.productName} style={{ width: 50, height: 50, objectFit: 'cover', borderRadius: 8 }} />}
+                avatar={
+                  <img
+                    src={item.productImageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200'}
+                    alt={item.productName}
+                    style={{ width: 50, height: 50, objectFit: 'cover', borderRadius: 8 }}
+                    onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200'; }}
+                  />
+                }
                 title={<span style={{ fontFamily: 'Playfair Display, serif', color: '#3D1A00' }}>{item.productName}</span>}
                 description={
                   <div style={{ color: '#9B7B6C', fontSize: 12 }}>
@@ -141,6 +165,15 @@ function OrdersContent() {
         <div className="order-total">
           ยอดรวม: <span>฿{order.totalAmount}</span>
         </div>
+        {!isHistory && (
+          <Button
+            danger
+            onClick={() => handleDeleteOngoing(order.id)}
+            style={{ fontFamily: 'Lato' }}
+          >
+            ยกเลิกออเดอร์
+          </Button>
+        )}
         {isHistory && (
           <Button 
             type="primary" 

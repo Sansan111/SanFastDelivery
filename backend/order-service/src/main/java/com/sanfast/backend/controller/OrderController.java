@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/orders")
-@CrossOrigin(origins = "*") // อนุญาตให้ Frontend (Next.js) ยิงเข้าได้
 public class OrderController {
 
     private final OrderService orderService;
@@ -43,6 +42,16 @@ public class OrderController {
             return ResponseEntity.ok(orderService.getOrdersByUserId(userId));
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteOngoingOrder(@PathVariable Long id, @RequestParam(required = false) Long userId) {
+        try {
+            orderService.deleteOngoingOrder(id, userId);
+            return ResponseEntity.ok(java.util.Map.of("deleted", true, "orderId", id));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("deleted", false, "error", e.getMessage()));
         }
     }
 }

@@ -12,7 +12,6 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/ai")
-@CrossOrigin(origins = "*")
 public class AiSearchController {
 
     private final ProductRepository productRepository;
@@ -95,7 +94,8 @@ public class AiSearchController {
             return ResponseEntity.ok(Map.of(
                 "query", query,
                 "products", recommended,
-                "total", recommended.size()
+                "total", recommended.size(),
+                "mode", "gemini"
             ));
 
         } catch (Exception e) {

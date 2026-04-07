@@ -6,11 +6,18 @@ import com.sanfast.backend.entity.OrderItem;
 import com.sanfast.backend.entity.User;
 import com.sanfast.backend.repository.OrderRepository;
 import com.sanfast.backend.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import com.sanfast.backend.dto.OrderResponse;
 
@@ -19,6 +26,11 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
+    private static final Set<String> DELETABLE_STATUSES = Set.of("PENDING", "PREPARING");
+    private final RestTemplate restTemplate = new RestTemplate();
+
+    @Value("${restaurant.service.base-url:http://localhost:8081}")
+    private String restaurantServiceBaseUrl;
 
     public OrderService(OrderRepository orderRepository, UserRepository userRepository) {
         this.orderRepository = orderRepository;
@@ -44,16 +56,20 @@ public class OrderService {
             orderItem.setProductId(itemReq.getProductId());
             orderItem.setQuantity(itemReq.getQuantity());
             
-            // หมายเหตุ: ในระบบจริงควรดึงราคาและชื่อจาก Restaurant Service ผ่าน REST/gRPC
-            // เพื่อความรวดเร็วในการ Demo เราจะใช้ราคาจำลองไปก่อน 
-            BigDecimal mockPrice = new BigDecimal("100.00"); 
-            orderItem.setPriceAtPurchase(mockPrice);
-            orderItem.setProductName("Product #" + itemReq.getProductId());
+            ProductSnapshot product = fetchProductSnapshot(itemReq.getProductId()).orElse(null);
+
+            BigDecimal price = product != null && product.price != null
+                    ? product.price
+                    : new BigDecimal("100.00");
+
+            orderItem.setPriceAtPurchase(price);
+            orderItem.setProductName(product != null && product.name != null ? product.name : ("Product #" + itemReq.getProductId()));
+            orderItem.setProductImageUrl(product != null ? product.imageUrl : null);
             orderItem.setNote(itemReq.getNote());
             
             order.addItem(orderItem);
 
-            BigDecimal itemTotal = mockPrice.multiply(BigDecimal.valueOf(itemReq.getQuantity()));
+            BigDecimal itemTotal = price.multiply(BigDecimal.valueOf(itemReq.getQuantity()));
             totalAmount = totalAmount.add(itemTotal);
         }
 
@@ -80,6 +96,56 @@ public class OrderService {
     public List<OrderResponse> getOrdersByUserId(Long userId) {
         List<Order> orders = orderRepository.findByUserId(userId);
         return orders.stream().map(this::mapToOrderResponse).collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void deleteOngoingOrder(Long orderId, Long userId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+        if (userId != null && (order.getUser() == null || !order.getUser().getId().equals(userId))) {
+            throw new RuntimeException("Order does not belong to user");
+        }
+
+        if (!DELETABLE_STATUSES.contains(order.getStatus())) {
+            throw new RuntimeException("Only ongoing orders can be deleted");
+        }
+
+        orderRepository.delete(order);
+    }
+
+    @SuppressWarnings("rawtypes")
+    private Optional<ProductSnapshot> fetchProductSnapshot(Long productId) {
+        if (productId == null) return Optional.empty();
+        try {
+            String url = restaurantServiceBaseUrl + "/api/products/" + productId;
+            ResponseEntity<Map> res = restTemplate.getForEntity(url, Map.class);
+            Map<?, ?> body = res.getBody();
+            if (body == null) return Optional.empty();
+
+            String name = Objects.toString(body.get("name"), null);
+            String imageUrl = Objects.toString(body.get("imageUrl"), null);
+            BigDecimal price = null;
+            Object priceObj = body.get("price");
+            if (priceObj != null) {
+                price = new BigDecimal(priceObj.toString());
+            }
+            return Optional.of(new ProductSnapshot(name, imageUrl, price));
+        } catch (Exception ignored) {
+            return Optional.empty();
+        }
+    }
+
+    private static final class ProductSnapshot {
+        private final String name;
+        private final String imageUrl;
+        private final BigDecimal price;
+
+        private ProductSnapshot(String name, String imageUrl, BigDecimal price) {
+            this.name = name;
+            this.imageUrl = imageUrl;
+            this.price = price;
+        }
     }
 
     private OrderResponse mapToOrderResponse(Order order) {
