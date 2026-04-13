@@ -1,0 +1,175 @@
+version: '3.8'
+
+services:
+  # ──────────── Infrastructure ────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - sanfast_network
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - sanfast_network
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: sanfast-postgres
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-rootpassword}
+      POSTGRES_DB: sanfast_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres_init/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - sanfast_network
+    restart: unless-stopped
+
+  redis:
+    image: redis:alpine
+    container_name: redis
+    networks:
+      - sanfast_network
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
+    networks:
+      - sanfast_network
+    restart: unless-stopped
+
+  # ──────────── Backend Services ────────────
+  gateway-service:
+    build:
+      context: .
+      dockerfile: backend/gateway-service/Dockerfile
+    container_name: gateway-service
+    ports:
+      - "8080:8080"
+    environment:
+      JAVA_OPTS: -Xmx192m -Xms64m
+      SPRING_CLOUD_GATEWAY_ROUTES_0_ID: restaurant-service
+      SPRING_CLOUD_GATEWAY_ROUTES_0_URI: http://restaurant-service:8081
+      SPRING_CLOUD_GATEWAY_ROUTES_0_PREDICATES_0: Path=/api/products/**, /api/ai/**
+      SPRING_CLOUD_GATEWAY_ROUTES_1_ID: order-service
+      SPRING_CLOUD_GATEWAY_ROUTES_1_URI: http://order-service:8082
+      SPRING_CLOUD_GATEWAY_ROUTES_1_PREDICATES_0: Path=/api/orders/**, /api/auth/**
+    depends_on:
+      - restaurant-service
+      - order-service
+    networks:
+      - sanfast_network
+    restart: unless-stopped
+
+  restaurant-service:
+    build:
+      context: .
+      dockerfile: backend/restaurant-service/Dockerfile
+    container_name: restaurant-service
+    environment:
+      JAVA_OPTS: -Xmx192m -Xms64m
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/sanfast_db
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-rootpassword}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_CACHE_TYPE: redis
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-REPLACEME}
+      GEMINI_API_URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - sanfast_network
+    restart: unless-stopped
+
+  order-service:
+    build:
+      context: .
+      dockerfile: backend/order-service/Dockerfile
+    container_name: order-service
+    environment:
+      JAVA_OPTS: -Xmx192m -Xms64m
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/sanfast_db
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-rootpassword}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASS:-guest}
+      RESTAURANT_SERVICE_BASE_URL: http://restaurant-service:8081
+      JWT_SECRET: ${JWT_SECRET:-CHANGE_ME_TO_A_LONG_RANDOM_SECRET_AT_LEAST_32_CHARS}
+    depends_on:
+      - postgres
+      - kafka
+      - rabbitmq
+    networks:
+      - sanfast_network
+    restart: unless-stopped
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: backend/notification-service/Dockerfile
+    container_name: notification-service
+    environment:
+      JAVA_OPTS: -Xmx192m -Xms64m
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_KAFKA_CONSUMER_GROUP_ID: notification-group
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASS:-guest}
+    depends_on:
+      - kafka
+      - rabbitmq
+    networks:
+      - sanfast_network
+    restart: unless-stopped
+
+  # ──────────── Frontend ────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE: http://${PUBLIC_IP:-localhost}:8080
+    container_name: frontend
+    ports:
+      - "80:3000"
+    depends_on:
+      - gateway-service
+    networks:
+      - sanfast_network
+    restart: unless-stopped
+
+networks:
+  sanfast_network:
+    driver: bridge
+
+volumes:
+  pgdata:
