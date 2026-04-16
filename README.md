@@ -79,18 +79,73 @@ cd ..
 docker compose down
 ```
 
-#### Deploy to AWS
+#### Deploy to AWS (EC2 + Docker Compose)
 
-AWS path (high-level):
-- Push images to **ECR**
-- Run services on **ECS Fargate**
-- Put **ALB** in front of gateway
-- Use **RDS Postgres** for database
-- Use **MSK (Kafka)** / **Amazon MQ (RabbitMQ)** / **ElastiCache (Redis)** as needed
+All services run on a single **EC2 instance** using **Docker Compose**, provisioned by **Terraform**.
 
-Docs/code to look at:
-- Dockerfiles: `backend/*-service/Dockerfile`
-- Terraform scaffold: `infra/terraform/`
+##### Architecture
+
+```
+Internet
+  │
+  ├── :80  → Next.js (frontend)
+  └── :8080 → Spring Cloud Gateway → restaurant / order / notification services
+                                       │
+                          ┌─────────────┼─────────────┐
+                       Postgres      Kafka       RabbitMQ
+```
+
+##### Prerequisites
+
+- AWS CLI configured (`aws configure`)
+- Terraform CLI installed
+- SSH key pair at `~/.ssh/sanfast-key` (or generate one)
+
+##### Quick deploy
+
+```bash
+chmod +x deploy.sh
+./deploy.sh
+```
+
+The script will:
+1. Provision AWS resources via Terraform (VPC, EC2 `t3.micro`, Security Group, Elastic IP)
+2. Upload source code to EC2 via `rsync`
+3. Build and start all services with `docker-compose.prod.yml` on EC2
+
+##### Manual deploy (step by step)
+
+```bash
+cd infra/terraform
+terraform init
+terraform apply -var="ssh_public_key=$(cat ~/.ssh/sanfast-key.pub)"
+
+# After EC2 is ready:
+export SERVER_IP=$(terraform output -raw public_ip)
+rsync -avz --exclude '.git' --exclude 'node_modules' --exclude '.terraform' \
+  ../../ ec2-user@$SERVER_IP:~/app/
+
+ssh ec2-user@$SERVER_IP "cd ~/app && PUBLIC_IP=$SERVER_IP docker compose -f docker-compose.prod.yml up -d --build"
+```
+
+##### Shut down (stop AWS charges)
+
+```bash
+cd infra/terraform
+terraform destroy -var="ssh_public_key=$(cat ~/.ssh/sanfast-key.pub)"
+```
+
+##### Key files
+
+| File | Purpose |
+|------|---------|
+| `deploy.sh` | One-command automated deploy script |
+| `docker-compose.prod.yml` | Production Docker Compose (all services) |
+| `frontend/Dockerfile` | Next.js standalone production build |
+| `backend/*-service/Dockerfile` | Spring Boot service builds |
+| `infra/terraform/main.tf` | Terraform: VPC, EC2, Security Group, EIP |
+| `infra/terraform/variables.tf` | Configurable variables (region, instance type, etc.) |
+| `infra/terraform/user-data.sh` | EC2 bootstrap: Docker, swap, env vars |
 
 ---
 
@@ -173,15 +228,71 @@ cd ..
 docker compose down
 ```
 
-#### Deploy AWS
+#### Deploy AWS (EC2 + Docker Compose)
 
-- push image ไป **ECR**
-- รันบน **ECS Fargate**
-- ใช้ **ALB** วางหน้า gateway
-- ใช้ **RDS Postgres**
-- ใช้ **MSK (Kafka)** / **Amazon MQ (RabbitMQ)** / **ElastiCache (Redis)** ตามความจำเป็น
+ทุก service รันบน **EC2 instance** เครื่องเดียว ผ่าน **Docker Compose** โดยใช้ **Terraform** สร้าง infrastructure
 
-ไฟล์ที่เกี่ยวข้อง:
-- Dockerfile: `backend/*-service/Dockerfile`
-- Terraform โครง: `infra/terraform/`
+##### สถาปัตยกรรม
+
+```
+Internet
+  │
+  ├── :80  → Next.js (frontend)
+  └── :8080 → Spring Cloud Gateway → restaurant / order / notification services
+                                       │
+                          ┌─────────────┼─────────────┐
+                       Postgres      Kafka       RabbitMQ
+```
+
+##### สิ่งที่ต้องมี
+
+- AWS CLI ตั้งค่าแล้ว (`aws configure`)
+- Terraform CLI
+- SSH key pair ที่ `~/.ssh/sanfast-key` (หรือสร้างใหม่)
+
+##### Deploy แบบเร็ว
+
+```bash
+chmod +x deploy.sh
+./deploy.sh
+```
+
+สคริปต์จะทำให้อัตโนมัติ:
+1. สร้าง AWS resources ผ่าน Terraform (VPC, EC2 `t3.micro`, Security Group, Elastic IP)
+2. อัพโหลดโค้ดไป EC2 ด้วย `rsync`
+3. Build และ start ทุก service ด้วย `docker-compose.prod.yml` บน EC2
+
+##### Deploy แบบ manual (ทีละขั้น)
+
+```bash
+cd infra/terraform
+terraform init
+terraform apply -var="ssh_public_key=$(cat ~/.ssh/sanfast-key.pub)"
+
+# หลัง EC2 พร้อมแล้ว:
+export SERVER_IP=$(terraform output -raw public_ip)
+rsync -avz --exclude '.git' --exclude 'node_modules' --exclude '.terraform' \
+  ../../ ec2-user@$SERVER_IP:~/app/
+
+ssh ec2-user@$SERVER_IP "cd ~/app && PUBLIC_IP=$SERVER_IP docker compose -f docker-compose.prod.yml up -d --build"
+```
+
+##### ปิดระบบ (หยุดค่าใช้จ่าย AWS)
+
+```bash
+cd infra/terraform
+terraform destroy -var="ssh_public_key=$(cat ~/.ssh/sanfast-key.pub)"
+```
+
+##### ไฟล์ที่เกี่ยวข้อง
+
+| ไฟล์ | หน้าที่ |
+|------|---------|
+| `deploy.sh` | สคริปต์ deploy อัตโนมัติ |
+| `docker-compose.prod.yml` | Docker Compose สำหรับ production (ทุก service) |
+| `frontend/Dockerfile` | Next.js standalone production build |
+| `backend/*-service/Dockerfile` | Build Spring Boot services |
+| `infra/terraform/main.tf` | Terraform: VPC, EC2, Security Group, EIP |
+| `infra/terraform/variables.tf` | ตัวแปรที่ปรับได้ (region, instance type ฯลฯ) |
+| `infra/terraform/user-data.sh` | EC2 bootstrap: ติดตั้ง Docker, swap, env vars |
 
